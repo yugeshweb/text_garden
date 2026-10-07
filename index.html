@@ -36,6 +36,11 @@ html[data-touch] [data-tg="app"]{touch-action:none;top:var(--tg-top,0px);bottom:
 [data-tg="btn"]{background:transparent;border:1px solid #3A3A3A;color:#BDBDBD;font:inherit;padding:8px 14px;border-radius:999px;cursor:pointer}
 [data-tg="btn"]:hover{border-color:#FFF;color:#FFF}
 [data-tg="coarse"]{display:none}
+[data-tg="hints"] span{white-space:nowrap}
+.sh{display:none}
+@media (max-width:600px){.lg{display:none}.sh{display:inline}}
+@media (max-width:380px){html [data-tg="hints"]{font-size:10px;letter-spacing:.02em;gap:6px 8px}}
+@media (max-width:340px){html [data-tg="hints"]{justify-content:flex-start;gap:4px 12px}}
 @media (pointer:coarse){[data-tg="fine"]{display:none}[data-tg="coarse"]{display:inline}}
 
 [data-tg="poster"]{position:absolute;inset:0;display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);background:#000;cursor:default;color:#EDEDED;font-size:12px;letter-spacing:.03em}
@@ -66,11 +71,14 @@ button:disabled{opacity:.5;cursor:default}
 [data-tg="stage"]{display:flex;align-items:center;justify-content:center;padding:56px 32px 32px;min-width:0}
 [data-tg="pcanvas"]{width:min(100%, calc(100vh - 96px));height:auto;aspect-ratio:1 / 1;display:block;border:1px solid #1E1E1E}
 
+html[data-kb] [data-tg="bar"]{display:none}
+@media (max-height:500px){[data-tg="hints"]{display:none}}
 @media (max-width:600px){
-  [data-tg="flowers"]{top:calc(64px + env(safe-area-inset-top))}
-  [data-tg="flowers"] button{padding:6px 10px;font-size:11px}
+  [data-tg="top"]{left:calc(16px + env(safe-area-inset-left));justify-content:space-between}
+  [data-tg="flowers"]{top:calc(64px + env(safe-area-inset-top));right:calc(16px + env(safe-area-inset-right))}
+  [data-tg="flowers"] button{flex:1;padding:7px 0;font-size:11px}
   [data-tg="bar"]{left:calc(16px + env(safe-area-inset-left));right:calc(16px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));gap:10px}
-  [data-tg="hints"]{gap:12px;font-size:11px}
+  [data-tg="hints"]{width:100%;justify-content:space-between;gap:6px 10px;font-size:11px}
   [data-tg="ctrls"]{flex:1 1 100%;justify-content:space-between;gap:8px}
   [data-tg="pal"]{gap:4px}
   [data-tg="sw"]{--sw:clamp(13px,calc((100vw - 183px) / 10),22px);width:var(--sw);height:var(--sw)}
@@ -103,7 +111,7 @@ button:disabled{opacity:.5;cursor:default}
     <div data-tg="hints">
       <span data-tg="fine">type to grow</span><span data-tg="coarse">tap to type</span>
       <span>space cuts</span>
-      <span data-tg="fine">backspace withers</span><span data-tg="coarse">⌫ withers</span>
+      <span data-tg="fine"><span class="lg">backspace</span><span class="sh">⌫</span> withers</span><span data-tg="coarse">⌫ withers</span>
       <span data-tg="fine">enter clears</span><span data-tg="coarse">return clears</span>
     </div>
     <div data-tg="ctrls">
@@ -188,6 +196,7 @@ class Garden {
     this.letters = []; this.uid = 1; this.cache = {}; this.Sd = 0; this.St = 0; this.wrapped = false;
     this.t0 = performance.now(); this.lastKey = 0; this.rand = Math.random;
     this.g = this.cv.getContext('2d');
+    this.renderUI();
     window.addEventListener('resize', () => this.resize());
     this.resize();
     window.addEventListener('keydown', e => this.key(e));
@@ -494,6 +503,12 @@ class Garden {
     if (!r.width) return;
     this.W = r.width; this.H = r.height; this.dpr = d;
     c.width = Math.round(r.width * d); c.height = Math.round(r.height * d);
+    let pt = 0, pb = 0;
+    if (this.W < 700 || this.H < 500) {
+      for (const el of [$('[data-tg="top"]'), $('#flowers')]) { const b = el.getBoundingClientRect(); if (b.height) pt = Math.max(pt, b.bottom - r.top + 8); }
+      const b = $('#bar').getBoundingClientRect(); if (b.height) pb = r.bottom - b.top + 8;
+    }
+    this.padT = pt; this.padB = pb;
     this.layout(true);
   }
   mw(ch) {
@@ -505,7 +520,7 @@ class Garden {
   }
   // sets tx/ty/tw on letters; keeps headroom for the garden above and below the type
   layoutCore(A, W, H, prevWrapped) {
-    const maxW = W * 0.8, S0 = H * 0.28, LH = 2.1;
+    const Hs = Math.min(H, W * 1.1), maxW = W * (W < 600 ? 0.74 : 0.8), S0 = Hs * 0.28, LH = 2.1;
     const ws = A.map(l => this.mw(l.ch));
     const words = []; let cur = null;
     A.forEach((l, i) => {
@@ -527,9 +542,9 @@ class Garden {
     const unit = lineW(lines[0], 1);
     let S = unit > 0 ? Math.min(S0, maxW / unit) : S0;
     const multi = words.filter(w => !w.sp).length > 1;
-    let wrapped = multi && (S < H * 0.1 || (prevWrapped && S < H * 0.14));
+    let wrapped = multi && (S < Hs * 0.1 || (prevWrapped && S < Hs * 0.14));
     if (wrapped) {
-      let lo = H * 0.03, hi = H * 0.15;
+      let lo = Hs * 0.03, hi = Hs * 0.15;
       for (let k = 0; k < 22; k++) {
         const mid = (lo + hi) / 2, ls = wrap(mid);
         const ok = ls.every(li => lineW(li, mid) <= maxW) && ls.length * LH * mid <= H * 0.82;
@@ -549,13 +564,14 @@ class Garden {
   layout(snap) {
     if (!this.W) return;
     const A = this.letters.filter(l => !l.dead);
-    const res = this.layoutCore(A, this.W, this.H, this.wrapped);
+    const res = this.layoutCore(A, this.W, this.H - (this.padT || 0) - (this.padB || 0), this.wrapped);
     this.wrapped = res.wrapped;
+    if (this.padT) A.forEach(l => { l.ty += this.padT; });
     A.forEach(l => { if (l.x == null) { l.x = l.tx; l.y = l.ty; } });
     const S = res.S, last = A[A.length - 1];
     this.St = S;
     this.ctx_ = last ? last.tx + last.tw / 2 + 0.07 * S : this.W / 2;
-    this.cty = last ? last.ty - 0.33 * S : this.H / 2;
+    this.cty = last ? last.ty - 0.33 * S : ((this.padT || 0) + this.H - (this.padB || 0)) / 2;
     if (snap || !this.Sd) { this.Sd = S; this.cx = this.ctx_; this.cy = this.cty; A.forEach(l => { l.x = l.tx; l.y = l.ty; }); }
   }
 
