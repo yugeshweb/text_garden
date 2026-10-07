@@ -1,4 +1,5 @@
 # Text Garden
+<img width="1895" height="957" alt="garden" src="https://github.com/user-attachments/assets/3e030bb0-21ba-4c05-90f7-13bd8a1d8810" />
 
 A little type toy where flowers grow out of your words.
 
